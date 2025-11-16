@@ -10,14 +10,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml
+# Copy pyproject.toml and source code
 COPY pyproject.toml ./
+COPY src/ ./src/
 
 # Install dependencies
 RUN pip install --no-cache-dir -e .
-
-# Copy source code
-COPY src/ ./src/
 
 # Create data directories for ChromaDB and SQLite
 RUN mkdir -p /data/chromadb /data/sqlite && chmod -R 777 /data
