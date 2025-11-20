@@ -8,7 +8,7 @@ from ...models.requests import DocumentListResponse
 from ...core.document_manager import DocumentManager
 from ...api.dependencies import get_user_id
 
-router = APIRouter(prefix="/api/v1/documents", tags=["documents"])
+router = APIRouter(prefix="/api/v1/knowledge/documents", tags=["documents"])
 logger = logging.getLogger(__name__)
 
 # These will be set by main.py after creating the app
