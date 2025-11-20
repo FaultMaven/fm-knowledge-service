@@ -5,9 +5,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for ChromaDB
+# Install system dependencies for ChromaDB and git (for fm-core-lib dependency)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy pyproject.toml and source code
