@@ -153,3 +153,131 @@ async def bulk_update_documents(
     except Exception as e:
         logger.error(f"Failed to bulk update documents: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# =============================================================================
+# Search & Collections (Phase 6.3)
+# =============================================================================
+
+@router.post("/search", summary="Search knowledge base")
+async def search_documents(
+    search_params: dict,
+    user_id: str = Depends(get_user_id)
+):
+    """Search knowledge base with filters and full-text search."""
+    try:
+        query = search_params.get("query", "")
+        document_type = search_params.get("document_type")
+        limit = search_params.get("limit", 50)
+        
+        # Get all documents and filter
+        all_docs, total = await doc_manager.list_documents(
+            user_id=user_id,
+            limit=1000,
+            offset=0,
+            document_type=document_type
+        )
+        
+        # Apply text search if query provided
+        if query:
+            query_lower = query.lower()
+            filtered = [
+                doc for doc in all_docs
+                if query_lower in doc.title.lower() or 
+                   (doc.content and query_lower in doc.content.lower())
+            ]
+        else:
+            filtered = all_docs
+        
+        results = filtered[:limit]
+        
+        return {
+            "query": query,
+            "results": [
+                {
+                    "document_id": doc.document_id,
+                    "title": doc.title,
+                    "document_type": doc.document_type,
+                    "created_at": doc.created_at.isoformat() if doc.created_at else None,
+                }
+                for doc in results
+            ],
+            "total_results": len(filtered),
+            "returned": len(results)
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to search documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/collections", summary="List document collections")
+async def list_collections(user_id: str = Depends(get_user_id)):
+    """List all document collections for user."""
+    try:
+        # TODO: Implement actual collections system
+        # For now, return document types as pseudo-collections
+        all_docs, _ = await doc_manager.list_documents(user_id=user_id, limit=1000, offset=0)
+        
+        types = {}
+        for doc in all_docs:
+            doc_type = doc.document_type or "uncategorized"
+            types[doc_type] = types.get(doc_type, 0) + 1
+        
+        collections = [
+            {
+                "collection_id": doc_type,
+                "name": doc_type.replace("_", " ").title(),
+                "document_count": count
+            }
+            for doc_type, count in types.items()
+        ]
+        
+        return {
+            "collections": collections,
+            "total": len(collections)
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to list collections: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/collections", summary="Create document collection")
+async def create_collection(
+    collection_data: dict,
+    user_id: str = Depends(get_user_id)
+):
+    """Create a new document collection."""
+    raise HTTPException(
+        status_code=status.HTTP_501_NOT_IMPLEMENTED,
+        detail="Collection creation not yet implemented"
+    )
+
+
+@router.post("/batch-delete", summary="Batch delete documents")
+async def batch_delete_documents(
+    document_ids: list[str],
+    user_id: str = Depends(get_user_id)
+):
+    """Delete multiple documents in batch."""
+    try:
+        deleted = 0
+        failed = []
+        
+        for doc_id in document_ids:
+            success = await doc_manager.delete_document(doc_id, user_id)
+            if success:
+                deleted += 1
+            else:
+                failed.append(doc_id)
+        
+        return {
+            "deleted": deleted,
+            "failed": len(failed),
+            "failed_ids": failed
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to batch delete documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
