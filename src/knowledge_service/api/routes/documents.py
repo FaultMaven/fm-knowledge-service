@@ -79,3 +79,77 @@ async def list_documents(
         limit=limit,
         offset=offset
     )
+
+
+# =============================================================================
+# Bulk Operations & Statistics (Phase 4)
+# =============================================================================
+
+@router.get("/stats", summary="Get knowledge base statistics")
+async def get_knowledge_stats(user_id: str = Depends(get_user_id)):
+    """Get knowledge base statistics for the user."""
+    try:
+        # Count documents by type
+        all_docs, total = await doc_manager.list_documents(user_id=user_id, limit=10000, offset=0)
+        
+        stats = {
+            "total_documents": total,
+            "by_type": {},
+            "total_size_bytes": 0,
+        }
+        
+        for doc in all_docs:
+            doc_type = doc.document_type or "unknown"
+            stats["by_type"][doc_type] = stats["by_type"].get(doc_type, 0) + 1
+            if hasattr(doc, "size_bytes") and doc.size_bytes:
+                stats["total_size_bytes"] += doc.size_bytes
+        
+        return stats
+    
+    except Exception as e:
+        logger.error(f"Failed to get knowledge stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/bulk-update", summary="Bulk update documents")
+async def bulk_update_documents(
+    updates: list[dict],
+    user_id: str = Depends(get_user_id)
+):
+    """Bulk update multiple documents.
+    
+    Request format:
+    [
+        {"document_id": "doc_123", "tags": ["updated"]},
+        {"document_id": "doc_456", "status": "archived"}
+    ]
+    """
+    try:
+        results = []
+        for update_data in updates:
+            doc_id = update_data.get("document_id")
+            if not doc_id:
+                results.append({"error": "Missing document_id"})
+                continue
+            
+            # Remove document_id from updates
+            updates_dict = {k: v for k, v in update_data.items() if k != "document_id"}
+            
+            from knowledge_service.models.document import DocumentUpdate
+            doc_update = DocumentUpdate(**updates_dict)
+            
+            updated_doc = await doc_manager.update_document(doc_id, user_id, doc_update)
+            if updated_doc:
+                results.append({"document_id": doc_id, "success": True})
+            else:
+                results.append({"document_id": doc_id, "success": False, "error": "Not found"})
+        
+        return {
+            "updated": sum(1 for r in results if r.get("success")),
+            "failed": sum(1 for r in results if not r.get("success")),
+            "results": results
+        }
+    
+    except Exception as e:
+        logger.error(f"Failed to bulk update documents: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
