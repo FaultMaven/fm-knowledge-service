@@ -11,7 +11,9 @@ from .infrastructure.vectordb.chromadb_client import ChromaDBClient
 from .infrastructure.vectordb.embeddings import EmbeddingGenerator
 from .core.document_manager import DocumentManager
 from .core.search_manager import SearchManager
-from .api.routes import documents, search
+from .core.job_manager import JobManager
+from .core.analytics_manager import AnalyticsManager
+from .api.routes import documents, search, knowledge_endpoints
 from .models.requests import HealthResponse
 
 # Configure logging
@@ -79,6 +81,7 @@ app.add_middleware(
 # Include routers
 app.include_router(documents.router)
 app.include_router(search.router)
+app.include_router(knowledge_endpoints.router)
 
 
 # Set up managers after including routers
@@ -87,10 +90,16 @@ async def setup_managers():
     """Set up managers after startup."""
     doc_mgr = DocumentManager(db_client, vector_client, embedding_gen)
     search_mgr = SearchManager(db_client, vector_client, embedding_gen)
+    job_mgr = JobManager()
+    analytics_mgr = AnalyticsManager()
+
+    # Start background cleanup task for jobs
+    await job_mgr.start_cleanup_task()
 
     # Set managers in route modules
-    documents.set_doc_manager(doc_mgr)
+    documents.set_managers(doc_mgr, search_mgr, job_mgr, analytics_mgr)
     search.set_search_manager(search_mgr)
+    knowledge_endpoints.set_managers(doc_mgr, search_mgr, job_mgr, analytics_mgr)
 
 
 @app.get("/health", response_model=HealthResponse)

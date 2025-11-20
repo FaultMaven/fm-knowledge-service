@@ -1,11 +1,25 @@
 """Document CRUD endpoints."""
 
 import logging
-from fastapi import APIRouter, HTTPException, Depends
+import time
+from fastapi import APIRouter, HTTPException, Depends, status
 from typing import Optional
 from ...models.document import DocumentCreate, DocumentUpdate, DocumentResponse
-from ...models.requests import DocumentListResponse
+from ...models.requests import (
+    DocumentListResponse,
+    UnifiedSearchRequest,
+    UnifiedSearchResponse,
+    SearchResultItem,
+    BulkDeleteRequest,
+    BulkDeleteResponse,
+    KnowledgeStatsResponse,
+    SearchAnalyticsResponse,
+    JobStatus
+)
 from ...core.document_manager import DocumentManager
+from ...core.search_manager import SearchManager
+from ...core.job_manager import JobManager
+from ...core.analytics_manager import AnalyticsManager
 from ...api.dependencies import get_user_id
 
 router = APIRouter(prefix="/api/v1/knowledge/documents", tags=["documents"])
@@ -13,12 +27,22 @@ logger = logging.getLogger(__name__)
 
 # These will be set by main.py after creating the app
 doc_manager: DocumentManager = None
+search_manager: SearchManager = None
+job_manager: JobManager = None
+analytics_manager: AnalyticsManager = None
 
 
-def set_doc_manager(manager: DocumentManager):
-    """Set the document manager instance (called from main.py)."""
-    global doc_manager
-    globals()['doc_manager'] = manager
+def set_managers(doc_mgr: DocumentManager, search_mgr: SearchManager = None,
+                 job_mgr: JobManager = None, analytics_mgr: AnalyticsManager = None):
+    """Set the manager instances (called from main.py)."""
+    global doc_manager, search_manager, job_manager, analytics_manager
+    globals()['doc_manager'] = doc_mgr
+    if search_mgr:
+        globals()['search_manager'] = search_mgr
+    if job_mgr:
+        globals()['job_manager'] = job_mgr
+    if analytics_mgr:
+        globals()['analytics_manager'] = analytics_mgr
 
 
 @router.post("", response_model=DocumentResponse, status_code=201)
