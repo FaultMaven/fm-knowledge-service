@@ -145,14 +145,15 @@ async def search_documents(
 
         execution_time_ms = (time.time() - start_time) * 1000
 
-        # Track analytics
-        analytics_manager.track_search(
-            query=query,
-            result_count=len(search_results),
-            execution_time_ms=execution_time_ms,
-            user_id=user_id,
-            search_mode=request.search_mode
-        )
+        # Track analytics (if available)
+        if analytics_manager is not None:
+            analytics_manager.track_search(
+                query=query,
+                result_count=len(search_results),
+                execution_time_ms=execution_time_ms,
+                user_id=user_id,
+                search_mode=request.search_mode
+            )
 
         return {
             "query": query,
