@@ -69,53 +69,61 @@ async def search_documents(
 
         if request.search_mode == "semantic":
             # Use semantic search via search_manager
-            results = await search_manager.search(
-                query=query,
-                user_id=user_id,
-                limit=request.limit,
-                document_type=request.document_type,
-                tags=request.tags
-            )
-            search_results = [SearchResultItem(**r) for r in results]
+            if search_manager is None:
+                logger.warning("Search manager not initialized - returning empty results")
+                search_results = []
+            else:
+                results = await search_manager.search(
+                    query=query,
+                    user_id=user_id,
+                    limit=request.limit,
+                    document_type=request.document_type,
+                    tags=request.tags
+                )
+                search_results = [SearchResultItem(**r) for r in results]
 
         elif request.search_mode == "keyword":
             # Use keyword search via document_manager
-            all_docs, total = await doc_manager.list_documents(
-                user_id=user_id,
-                limit=1000,
-                offset=0,
-                document_type=request.document_type
-            )
+            if doc_manager is None:
+                logger.warning("Document manager not initialized - returning empty results")
+                search_results = []
+            else:
+                all_docs, total = await doc_manager.list_documents(
+                    user_id=user_id,
+                    limit=1000,
+                    offset=0,
+                    document_type=request.document_type
+                )
 
-            # Filter by query text
-            query_lower = query.lower()
-            filtered = [
-                doc for doc in all_docs
-                if query_lower in doc.title.lower() or
-                   (doc.content and query_lower in doc.content.lower())
-            ]
-
-            # Apply tag filtering if specified
-            if request.tags:
+                # Filter by query text
+                query_lower = query.lower()
                 filtered = [
-                    doc for doc in filtered
-                    if any(tag in doc.tags for tag in request.tags)
+                    doc for doc in all_docs
+                    if query_lower in doc.title.lower() or
+                       (doc.content and query_lower in doc.content.lower())
                 ]
 
-            # Paginate results
-            paginated = filtered[request.offset:request.offset + request.limit]
+                # Apply tag filtering if specified
+                if request.tags:
+                    filtered = [
+                        doc for doc in filtered
+                        if any(tag in doc.tags for tag in request.tags)
+                    ]
 
-            search_results = [
-                SearchResultItem(
-                    document_id=doc.document_id,
-                    title=doc.title,
-                    document_type=doc.document_type or "unknown",
-                    tags=doc.tags or [],
-                    score=1.0,
-                    snippet=doc.content[:200] if doc.content else ""
-                )
-                for doc in paginated
-            ]
+                # Paginate results
+                paginated = filtered[request.offset:request.offset + request.limit]
+
+                search_results = [
+                    SearchResultItem(
+                        document_id=doc.document_id,
+                        title=doc.title,
+                        document_type=doc.document_type or "unknown",
+                        tags=doc.tags or [],
+                        score=1.0,
+                        snippet=doc.content[:200] if doc.content else ""
+                    )
+                    for doc in paginated
+                ]
 
         elif request.search_mode == "hybrid":
             # Hybrid mode - combine both approaches (simplified for now)
