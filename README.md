@@ -10,16 +10,31 @@
 
 ## Overview
 
-The Knowledge Service implements a Retrieval-Augmented Generation (RAG) system for FaultMaven, allowing users to upload and search through troubleshooting documentation. Documents are chunked, embedded using BGE-M3 embeddings, and stored in ChromaDB for fast semantic search.
+The Knowledge Service implements a Retrieval-Augmented Generation (RAG) system for FaultMaven, allowing users to upload and search through troubleshooting documentation. Documents are chunked, embedded using BGE-M3 embeddings, and stored in a vector database for fast semantic search.
 
 **Features:**
 - **Document Upload**: Support for TXT, MD, PDF, DOC, DOCX, RTF formats
 - **Automatic Chunking**: Intelligent text splitting with overlap
-- **Semantic Search**: BGE-M3 embeddings with ChromaDB vector store
-- **Metadata Tracking**: SQLite metadata database for documents
+- **Semantic Search**: BGE-M3 embeddings with pluggable vector database
+- **Deployment Neutrality**: ChromaDB for dev (embedded), Pinecone for production (cloud-scale)
+- **Metadata Tracking**: SQLite/PostgreSQL metadata database for documents
 - **User Isolation**: Each user only accesses their own documents
-- **Persistent Storage**: ChromaDB data persists to disk
+- **Persistent Storage**: Vector data persists across deployments
 - **Full-text + Vector**: Hybrid search capabilities
+
+### Vector Database Providers
+
+The service uses a **provider pattern** for vector database abstraction:
+
+| Provider | Use Case | Scale | Configuration |
+|----------|----------|-------|---------------|
+| **ChromaDB** (default) | Laptop/dev, self-hosted | ~100K documents | Embedded SQLite backend |
+| **Pinecone** | Production, enterprise | Billions of documents | Managed cloud service |
+
+**Benefits:**
+- ✅ **Zero code changes** between environments
+- ✅ **Same Docker image** for dev and production
+- ✅ **Simple migration** via environment variables
 
 ## Quick Start
 
@@ -85,18 +100,74 @@ uvicorn knowledge_service.main:app --reload --port 8004
 
 Configuration via environment variables:
 
+### Service Configuration
+
 | Variable | Description | Default |
 |----------|-------------|---------|
 | `SERVICE_NAME` | Service identifier | `fm-knowledge-service` |
 | `ENVIRONMENT` | Deployment environment | `development` |
 | `PORT` | Service port | `8004` |
-| `DATABASE_URL` | SQLite connection string | `sqlite+aiosqlite:////data/sqlite/fm_knowledge.db` |
-| `CHROMADB_PATH` | ChromaDB data directory | `/data/chromadb` |
+| `LOG_LEVEL` | Logging level | `INFO` |
+
+### Database Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `DATABASE_URL` | Database connection string | `sqlite+aiosqlite:////data/sqlite/fm_knowledge.db` |
+
+**Supported databases:**
+- **SQLite** (default): `sqlite+aiosqlite:////data/sqlite/fm_knowledge.db`
+- **PostgreSQL**: `postgresql+asyncpg://user:pass@host:5432/faultmaven`
+
+### Vector Database Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `VECTOR_DB_PROVIDER` | Vector database provider (`chroma` or `pinecone`) | `chroma` |
+
+#### ChromaDB Configuration (Default)
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CHROMA_HOST` | ChromaDB server host | `localhost` |
+| `CHROMA_PORT` | ChromaDB server port | `8007` |
+| `CHROMADB_PATH` | ChromaDB data directory (legacy) | `/data/chromadb` |
+
+#### Pinecone Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `PINECONE_API_KEY` | Pinecone API key | _(required)_ |
+| `PINECONE_ENVIRONMENT` | Pinecone environment (e.g., `us-east-1`) | _(required)_ |
+| `PINECONE_INDEX_NAME` | Pinecone index name | `faultmaven-knowledge` |
+
+### Document Processing
+
+| Variable | Description | Default |
+|----------|-------------|---------|
 | `EMBEDDING_MODEL` | Embeddings model name | `BAAI/bge-m3` |
 | `CHUNK_SIZE` | Text chunk size | `1000` |
 | `CHUNK_OVERLAP` | Chunk overlap size | `200` |
 | `MAX_UPLOAD_SIZE_MB` | Maximum file size | `10` |
-| `LOG_LEVEL` | Logging level | `INFO` |
+
+### Example Configurations
+
+**Development (ChromaDB):**
+```bash
+VECTOR_DB_PROVIDER=chroma
+CHROMA_HOST=localhost
+CHROMA_PORT=8007
+DATABASE_URL=sqlite+aiosqlite:////data/sqlite/fm_knowledge.db
+```
+
+**Production (Pinecone + PostgreSQL):**
+```bash
+VECTOR_DB_PROVIDER=pinecone
+PINECONE_API_KEY=your-api-key
+PINECONE_ENVIRONMENT=us-east-1
+PINECONE_INDEX_NAME=faultmaven-production-kb
+DATABASE_URL=postgresql+asyncpg://user:pass@postgres:5432/faultmaven
+```
 
 ## Document Upload
 
