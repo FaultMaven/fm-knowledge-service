@@ -4,6 +4,7 @@ import logging
 from typing import List, Dict, Any, Optional
 import chromadb
 from chromadb.config import Settings
+from fm_core_lib.utils import service_startup_retry
 
 logger = logging.getLogger(__name__)
 
@@ -13,26 +14,41 @@ class ChromaDBClient:
 
     def __init__(self, persist_directory: str, collection_name: str):
         """Initialize ChromaDB client.
-        
+
         Args:
             persist_directory: Directory for persistent storage
             collection_name: Name of the ChromaDB collection
         """
         self.persist_directory = persist_directory
         self.collection_name = collection_name
-        
-        logger.info(f"Initializing ChromaDB at {persist_directory}")
+        self.client = None
+        self.collection = None
+
+        # Initialization happens in verify_and_initialize() for retry support
+        logger.info(f"ChromaDB client created (will initialize on startup)")
+
+    @service_startup_retry
+    def verify_and_initialize(self):
+        """Verify ChromaDB is accessible and initialize with retry logic.
+
+        This is called on startup to handle cases where the persist directory
+        might not be immediately available (K8s volume mounts, NFS delays, etc.).
+        """
+        logger.info(f"Initializing ChromaDB at {self.persist_directory}")
         self.client = chromadb.PersistentClient(
-            path=persist_directory,
+            path=self.persist_directory,
             settings=Settings(anonymized_telemetry=False, allow_reset=False)
         )
-        
+
+        # Verify connection works
+        self.client.heartbeat()
+
         # Get or create collection
         self.collection = self.client.get_or_create_collection(
-            name=collection_name,
+            name=self.collection_name,
             metadata={"description": "FaultMaven Knowledge Base"}
         )
-        logger.info(f"ChromaDB collection '{collection_name}' ready")
+        logger.info(f"ChromaDB collection '{self.collection_name}' ready")
 
     async def add_document(
         self, 

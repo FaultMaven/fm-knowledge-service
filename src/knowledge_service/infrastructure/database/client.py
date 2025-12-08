@@ -4,6 +4,7 @@ import logging
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import select, delete
+from fm_core_lib.utils import service_startup_retry
 from .models import Base, DocumentModel
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,22 @@ class DatabaseClient:
             self.engine, class_=AsyncSession, expire_on_commit=False
         )
 
+    @service_startup_retry
+    async def verify_connection(self):
+        """Verify database connection with retry logic.
+
+        This is called before migrations/table creation to ensure the database
+        is ready. Retries with exponential backoff for K8s/scale-to-zero scenarios.
+        """
+        async with self.engine.begin() as conn:
+            await conn.execute("SELECT 1")
+        logger.info("Database connection verified")
+
     async def initialize(self):
         """Create database tables."""
+        # Verify connection first (with retry logic)
+        await self.verify_connection()
+
         async with self.engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized successfully")

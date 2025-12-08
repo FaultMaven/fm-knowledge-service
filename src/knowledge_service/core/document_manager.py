@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional, List
 from ..infrastructure.database.client import DatabaseClient
 from ..infrastructure.database.models import DocumentModel
-from ..infrastructure.vectordb.chromadb_client import ChromaDBClient
+from ..infrastructure.vectordb import VectorDBProvider
 from ..infrastructure.vectordb.embeddings import EmbeddingGenerator
 from ..models.document import DocumentCreate, DocumentUpdate, Document
 
@@ -19,14 +19,14 @@ class DocumentManager:
     def __init__(
         self,
         db_client: DatabaseClient,
-        vector_client: ChromaDBClient,
+        vector_client: VectorDBProvider,
         embedding_gen: EmbeddingGenerator
     ):
         """Initialize document manager.
-        
+
         Args:
             db_client: Database client for metadata
-            vector_client: Vector database client
+            vector_client: Vector database provider (deployment-neutral)
             embedding_gen: Embedding generator
         """
         self.db = db_client
@@ -67,7 +67,7 @@ class DocumentManager:
         
         created_doc = await self.db.create_document(db_doc)
         
-        # Add to vector database
+        # Add to vector database using provider interface
         vector_metadata = {
             "document_id": document_id,
             "user_id": user_id,
@@ -75,12 +75,15 @@ class DocumentManager:
             "document_type": doc_data.document_type,
             "tags": ",".join(doc_data.tags),
         }
-        
-        await self.vector_db.add_document(
-            embedding_id=embedding_id,
-            embedding=embedding,
-            content=doc_data.content,
-            metadata=vector_metadata
+
+        await self.vector_db.upsert_vectors(
+            collection_name="faultmaven_kb",
+            vectors=[{
+                "id": embedding_id,
+                "values": embedding,
+                "content": doc_data.content,
+                "metadata": vector_metadata
+            }]
         )
         
         logger.info(f"Created document {document_id} for user {user_id}")
@@ -174,11 +177,14 @@ class DocumentManager:
                 "tags": ",".join(updated_doc.tags),
             }
             
-            await self.vector_db.update_document(
-                embedding_id=updated_doc.embedding_id,
-                embedding=embedding,
-                content=updated_doc.content,
-                metadata=vector_metadata
+            await self.vector_db.upsert_vectors(
+                collection_name="faultmaven_kb",
+                vectors=[{
+                    "id": updated_doc.embedding_id,
+                    "values": embedding,
+                    "content": updated_doc.content,
+                    "metadata": vector_metadata
+                }]
             )
         
         logger.info(f"Updated document {document_id}")
@@ -211,8 +217,11 @@ class DocumentManager:
         if not doc:
             return False
         
-        # Delete from vector database
-        await self.vector_db.delete_document(doc.embedding_id)
+        # Delete from vector database using provider interface
+        await self.vector_db.delete_vectors(
+            collection_name="faultmaven_kb",
+            vector_ids=[doc.embedding_id]
+        )
         
         # Delete from metadata database
         deleted = await self.db.delete_document(document_id, user_id)

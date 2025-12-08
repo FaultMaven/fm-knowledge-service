@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config.settings import get_settings, Settings
 from .infrastructure.database.client import DatabaseClient
-from .infrastructure.vectordb.chromadb_client import ChromaDBClient
+from .infrastructure.vectordb import get_vector_provider, VectorDBProvider
 from .infrastructure.vectordb.embeddings import EmbeddingGenerator
 from .core.document_manager import DocumentManager
 from .core.search_manager import SearchManager
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 # Global instances
 db_client: DatabaseClient = None
-vector_client: ChromaDBClient = None
+vector_client: VectorDBProvider = None
 embedding_gen: EmbeddingGenerator = None
 
 
@@ -33,28 +33,33 @@ embedding_gen: EmbeddingGenerator = None
 async def lifespan(app: FastAPI):
     """Application lifespan events."""
     global db_client, vector_client, embedding_gen
-    
+
     settings = get_settings()
     logger.info(f"Starting {settings.service_name} v1.0.0")
-    
+
     # Initialize components
     logger.info("Initializing database...")
     db_client = DatabaseClient(settings.database_url)
     await db_client.initialize()
-    
-    logger.info("Initializing vector database...")
-    vector_client = ChromaDBClient(
-        persist_directory=settings.chroma_persist_dir,
-        collection_name=settings.chroma_collection_name
+
+    logger.info("Initializing vector database provider...")
+    # Use factory pattern for deployment-neutral vector DB
+    vector_client = get_vector_provider()
+    await vector_client.initialize()
+
+    # Create default collection
+    await vector_client.create_collection(
+        name=settings.chroma_collection_name,
+        dimension=384  # all-MiniLM-L6-v2 dimension
     )
-    
+
     logger.info("Loading embedding model...")
     embedding_gen = EmbeddingGenerator(settings.embedding_model)
-    
+
     logger.info(f"{settings.service_name} is ready")
-    
+
     yield
-    
+
     # Cleanup
     logger.info("Shutting down...")
     await db_client.close()

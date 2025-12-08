@@ -3,6 +3,11 @@
 
 FROM python:3.11-slim
 
+# Build argument for PyTorch device type (cpu or gpu)
+# Default: cpu (reduces image from 8.5GB to ~2GB)
+# For GPU support: docker build --build-arg DEVICE_TYPE=gpu
+ARG DEVICE_TYPE=cpu
+
 WORKDIR /app
 
 # Install system dependencies for ChromaDB and git (for fm-core-lib dependency)
@@ -11,11 +16,27 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy pyproject.toml and source code
+# Copy pyproject.toml, source code, and migrations
 COPY pyproject.toml ./
 COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
-# Install dependencies
+# CRITICAL: Install PyTorch FIRST to prevent sentence-transformers from pulling GPU version
+# The DEVICE_TYPE build arg controls CPU vs GPU (default: cpu)
+#
+# Why this works:
+# 1. sentence-transformers declares torch as a dependency
+# 2. If we install sentence-transformers first, pip pulls the GPU torch (~4.3GB CUDA bloat)
+# 3. By installing torch first with --index-url, pip respects the existing install
+# 4. Result: Image shrinks from 8.5GB to ~2GB
+RUN if [ "$DEVICE_TYPE" = "cpu" ]; then \
+      pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu; \
+    else \
+      pip install --no-cache-dir torch torchvision; \
+    fi
+
+# Install dependencies - pip will use pre-installed torch and NOT upgrade it
 RUN pip install --no-cache-dir -e .
 
 # Create data directories for ChromaDB and SQLite
@@ -31,5 +52,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=2)"
 
-# Run service
-CMD ["python", "-m", "uvicorn", "knowledge_service.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run migrations then start service
+CMD ["sh", "-c", "alembic upgrade head && python -m uvicorn knowledge_service.main:app --host 0.0.0.0 --port 8000"]
