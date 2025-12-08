@@ -3,7 +3,7 @@
 import logging
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 from fm_core_lib.utils import service_startup_retry
 from .models import Base, DocumentModel
 
@@ -32,7 +32,7 @@ class DatabaseClient:
         is ready. Retries with exponential backoff for K8s/scale-to-zero scenarios.
         """
         async with self.engine.begin() as conn:
-            await conn.execute("SELECT 1")
+            await conn.execute(text("SELECT 1"))
         logger.info("Database connection verified")
 
     async def initialize(self):
