@@ -111,15 +111,15 @@ async def setup_managers():
 async def health_check():
     """Health check endpoint."""
     settings = get_settings()
-    
+
     db_connected = db_client is not None
-    chroma_connected = vector_client is not None and vector_client.get_collection_count() >= 0
-    
+    vector_connected = vector_client is not None
+
     return HealthResponse(
-        status="healthy" if (db_connected and chroma_connected) else "degraded",
+        status="healthy" if (db_connected and vector_connected) else "degraded",
         service=settings.service_name,
         version="1.0.0",
-        chroma_connected=chroma_connected,
+        chroma_connected=vector_connected,
         database_connected=db_connected
     )
 
