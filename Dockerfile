@@ -10,17 +10,20 @@ ARG DEVICE_TYPE=cpu
 
 WORKDIR /app
 
-# Install system dependencies for ChromaDB and git (for fm-core-lib dependency)
+# Install system dependencies for ChromaDB
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    git \
     && rm -rf /var/lib/apt/lists/*
 
+# Copy fm-core-lib first (required dependency)
+COPY fm-core-lib/ ./fm-core-lib/
+RUN pip install --no-cache-dir ./fm-core-lib
+
 # Copy pyproject.toml, source code, and migrations
-COPY pyproject.toml ./
-COPY src/ ./src/
-COPY alembic/ ./alembic/
-COPY alembic.ini ./
+COPY fm-knowledge-service/pyproject.toml ./
+COPY fm-knowledge-service/src/ ./src/
+COPY fm-knowledge-service/alembic/ ./alembic/
+COPY fm-knowledge-service/alembic.ini ./
 
 # CRITICAL: Install PyTorch FIRST to prevent sentence-transformers from pulling GPU version
 # The DEVICE_TYPE build arg controls CPU vs GPU (default: cpu)
