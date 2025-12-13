@@ -1,43 +1,50 @@
-[build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "fm-knowledge-service"
 version = "1.0.0"
 description = "FaultMaven Knowledge Service - Microservice for knowledge base management with RAG"
+authors = ["FaultMaven Team"]
 readme = "README.md"
-requires-python = ">=3.10"
-dependencies = [
-    "fastapi>=0.104.0",
-    "uvicorn[standard]>=0.24.0",
-    "pydantic>=2.4.0",
-    "pydantic-settings>=2.0.0",
-    "sqlalchemy[asyncio]>=2.0.0",
-    "aiosqlite>=0.19.0",
-    "alembic>=1.13.0",
-    "asyncpg>=0.29.0",
-    "chromadb>=0.5.3",
-    "sentence-transformers>=3.0.1",
-    "pypdf>=4.2.0",
-    "python-docx>=1.1.2",
-    "python-dotenv>=1.0.0",
-    "python-multipart>=0.0.6",
-    "tenacity>=8.3.0",
-    # FaultMaven Core Library
-    "fm-core-lib",
-]
+packages = [{include = "knowledge_service", from = "src"}]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.4.0",
-    "pytest-asyncio>=0.21.0",
-    "httpx>=0.25.0",
-]
-# Enterprise vector database (for cloud deployments)
-pinecone = [
-    "pinecone-client>=3.0.0",
-]
+[tool.poetry.dependencies]
+python = "^3.11"
+fm-core-lib = {path = "fm-core-lib", develop = true}
+fastapi = "^0.109.0"
+uvicorn = {extras = ["standard"], version = "^0.27.0"}
+pydantic = "^2.5.0"
+pydantic-settings = "^2.1.0"
+python-dotenv = "^1.0.0"
+sqlalchemy = {extras = ["asyncio"], version = "^2.0.25"}
+aiosqlite = "^0.19.0"
+alembic = "^1.13.0"
+asyncpg = "^0.29.0"
+httpx = "^0.28.1"
+chromadb = "^0.5.3"
+sentence-transformers = "^3.0.1"
+pypdf = "^4.2.0"
+python-docx = "^1.1.2"
+python-multipart = "^0.0.6"
+tenacity = "^8.3.0"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-asyncio = "^0.21.0"
+pytest-cov = "^4.1.0"
+black = "^23.10.0"
+flake8 = "^6.1.0"
+mypy = "^1.6.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
