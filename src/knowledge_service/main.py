@@ -107,7 +107,49 @@ async def setup_managers():
     knowledge_endpoints.set_managers(doc_mgr, search_mgr, job_mgr, analytics_mgr)
 
 
-@app.get("/health", response_model=HealthResponse)
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+    summary="Health Check",
+    description="""
+Returns the health status of the Knowledge Service and its dependencies.
+
+**Workflow**:
+1. Checks service availability
+2. Verifies database connection status
+3. Verifies ChromaDB vector database connection status
+4. Returns service metadata and component health
+
+**Response Example**:
+```json
+{
+  "status": "healthy",
+  "service": "fm-knowledge-service",
+  "version": "1.0.0",
+  "database_connected": true,
+  "chroma_connected": true
+}
+```
+
+**Use Cases**:
+- Kubernetes liveness/readiness probes
+- Load balancer health checks
+- Service mesh health monitoring
+- Docker Compose healthcheck
+- Monitoring systems (Prometheus, Datadog, etc.)
+
+**Storage**:
+- No database query (reports connection status only)
+- ChromaDB: No vector query (reports connection status only)
+
+**Rate Limits**: None
+**Authorization**: None required (public endpoint)
+    """,
+    responses={
+        200: {"description": "Service is healthy and all dependencies are operational"},
+        500: {"description": "Service is unhealthy or experiencing issues"}
+    }
+)
 async def health_check():
     """Health check endpoint."""
     settings = get_settings()
@@ -124,7 +166,41 @@ async def health_check():
     )
 
 
-@app.get("/")
+@app.get(
+    "/",
+    summary="Service Information",
+    description="""
+Returns basic information about the Knowledge Service.
+
+**Workflow**:
+1. Returns service metadata
+2. Confirms service is running and responsive
+3. Provides version information
+
+**Response Example**:
+```json
+{
+  "service": "fm-knowledge-service",
+  "version": "1.0.0",
+  "status": "running"
+}
+```
+
+**Use Cases**:
+- Quick verification that service is running
+- Service discovery
+- Version checking
+- API exploration starting point
+
+**Storage**: No database access required
+**Rate Limits**: None
+**Authorization**: None required (public endpoint)
+    """,
+    responses={
+        200: {"description": "Service information returned successfully"},
+        500: {"description": "Service is experiencing issues"}
+    }
+)
 async def root():
     """Root endpoint."""
     return {
