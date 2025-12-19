@@ -28,7 +28,7 @@ The service uses a **provider pattern** for vector database abstraction:
 
 | Provider | Use Case | Scale | Configuration |
 |----------|----------|-------|---------------|
-| **ChromaDB** (default) | Laptop/dev, self-hosted | ~100K documents | Embedded SQLite backend |
+| **ChromaDB** (default) | Laptop/dev, FaultMaven Core | ~100K documents | Embedded SQLite backend |
 | **Pinecone** | Production, enterprise | Billions of documents | Managed cloud service |
 
 **Benefits:**
